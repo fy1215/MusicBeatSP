@@ -377,7 +377,7 @@ private fun ExternalMediaCard(
                     if (now.canNext) IconButton(onClick = ExternalMedia::next) { Icon(Icons.Rounded.SkipNext, stringResource(R.string.widget_next)) }
                     IconButton(onClick = { ExternalMedia.openApp(context) }) { Icon(Icons.Rounded.OpenInNew, stringResource(R.string.service_open_app)) }
                 }
-            　com.music.bitchord.external.ExternalLyricsCheckSection(now)
+        com.music.bitchord.external.ExternalLyricsCheckSection(now)
             }
         }
     }
