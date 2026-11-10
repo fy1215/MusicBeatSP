@@ -53,6 +53,13 @@ object ExternalMedia {
     var now by mutableStateOf<NowPlaying?>(null)
         private set
 
+    /**
+     * 確認用: ほかのアプリがメディアセッションに入れている情報をそのまま並べたもの(キー → 値)。
+     * ローカルの曲をどう名乗っているか(曲名・アーティスト・メディア ID など)を実機で調べるために使う
+     */
+    var rawMetadata by mutableStateOf<List<Pair<String, String>>>(emptyList())
+        private set
+
     /** 「通知へのアクセス」が許可されているか */
     var permitted by mutableStateOf(false)
         private set
@@ -159,8 +166,11 @@ object ExternalMedia {
         val md = c?.metadata
         if (c == null || md == null) {
             now = null
+            rawMetadata = emptyList()
             return
         }
+        val raw = describeMetadata(md)
+        if (raw != rawMetadata) rawMetadata = raw
         val st = c.playbackState
         val actions = st?.actions ?: 0L
         val title = md.getString(MediaMetadata.METADATA_KEY_TITLE)
@@ -187,6 +197,29 @@ object ExternalMedia {
         // 何も変わっていなければ入れ替えない(画面を描き直さない)
         if (n != now) now = n
     }
+
+    /** メタデータの中身をすべて文字にする(画像は大きさだけ) */
+    private fun describeMetadata(md: MediaMetadata): List<Pair<String, String>> =
+        md.keySet().sorted().map { key ->
+            val value = runCatching {
+                val bmp = if (key in BITMAP_KEYS) md.getBitmap(key) else null
+                when {
+                    bmp != null -> "(画像 ${bmp.width}×${bmp.height})"
+                    key in LONG_KEYS -> md.getLong(key).toString()
+                    else -> md.getText(key)?.toString()
+                        ?: md.getLong(key).toString()
+                }
+            }.getOrElse { "(読めない: ${it.javaClass.simpleName})" }
+            key.removePrefix("android.media.metadata.") to value
+        }
+
+    private val BITMAP_KEYS = setOf(
+        MediaMetadata.METADATA_KEY_ART, MediaMetadata.METADATA_KEY_ALBUM_ART, MediaMetadata.METADATA_KEY_DISPLAY_ICON,
+    )
+    private val LONG_KEYS = setOf(
+        MediaMetadata.METADATA_KEY_DURATION, MediaMetadata.METADATA_KEY_YEAR, MediaMetadata.METADATA_KEY_TRACK_NUMBER,
+        MediaMetadata.METADATA_KEY_NUM_TRACKS, MediaMetadata.METADATA_KEY_DISC_NUMBER, MediaMetadata.METADATA_KEY_BT_FOLDER_TYPE,
+    )
 
     // ---- 高画質のジャケット ----
     // メディアセッションに入っている画像は小さく縮められていることが多い(Android が大きさを制限する)ので、
